@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # Define the directory containing the files to be sorted
-directory="/mnt/c/Users/reece/Downloads"
+echo "enter the directory to be sorted"
+read -p "directory : " directory
 
 # Create a sorted directory if it doesn't exist
 sorted_directory="${directory}/sorted_files"
