@@ -3,12 +3,13 @@ function calculateResults() {
   const sheet15 = ss.getSheetByName("Sheet15");
   const roleSheet = ss.getSheetByName("Role");
 
-  // Get data from Sheet15
-  const sourceSheets = sheet15.getRange("C20:C28").getValues().flat(); // Sheet names
-  const lookupValues = sheet15.getRange("D20:D28").getValues().flat(); // Lookup values
-  const resultRange = sheet15.getRange("E20:E28");
+  // Get input ranges
+  const sourceSheets = sheet15.getRange("C20:C28").getValues().flat(); // Source sheet names
+  const lookupValues = sheet15.getRange("D20:D28").getValues().flat(); // Lookup values (D20:D28)
+  const resultRange = sheet15.getRange("E20:E28"); // Where results will be written
+  const filterValue = sheet15.getRange("A1").getValue(); // Filter value (Sheet15!A1)
 
-  // Fetch the Role lookup table
+  // Role table for VLOOKUP
   const roleData = roleSheet.getRange("A:B").getValues();
 
   // Helper function: Simulate VLOOKUP
@@ -33,33 +34,46 @@ function calculateResults() {
 
     const sheet = ss.getSheetByName(sheetName);
     if (!sheet) {
-      results.push("Sheet not found"); // Handle missing sheets
+      results.push("Sheet not found");
       continue;
     }
 
-    // Get source data
-    const dataRange = sheet.getRange("A3:BM367").getValues();
-    const columnF = sheet.getRange("F3:F367").getValues();
-    const columnC = sheet.getRange("C3:C367").getValues();
-    const headers = sheet.getRange("AC2:BM2").getValues()[0];
+    // Get data from the source sheet
+    const dataRange = sheet.getRange("A3:BM367").getValues(); // Full data
+    const columnF = sheet.getRange("F3:F367").getValues(); // Column F (LEFTB filter)
+    const columnC = sheet.getRange("C3:C367").getValues(); // Column C (matches Sheet15!A1)
+    const headers = sheet.getRange("AC2:BM2").getValues()[0]; // Headers in AC2:BM2
+
+    Logger.log(`Processing sheet: ${sheetName}`);
+    Logger.log(`Lookup Value: ${lookupValue}`);
+    Logger.log(`Headers: ${headers}`);
 
     let totalSum = 0;
 
     for (let row = 0; row < dataRange.length; row++) {
-      const leftbValue = parseInt(columnF[row][0].toString().substring(0, 2)); // Simulate LEFTB
-      if (leftbValue >= 27 && columnC[row][0] === sheet15.getRange("A1").getValue()) {
-        for (let col = 28; col < dataRange[row].length; col++) { // AC to BM
-          const roleValue = vlookup(headers[col - 28], roleData); // Adjust index for AC:BM
+      const leftbValue = parseInt(columnF[row][0]?.toString().substring(0, 2)); // Simulate LEFTB
+      if (isNaN(leftbValue)) {
+        Logger.log(`Row ${row + 3}: Invalid LEFTB value: ${columnF[row][0]}`);
+        continue;
+      }
+
+      // Check filtering conditions
+      if (leftbValue >= 27 && columnC[row][0] === filterValue) {
+        for (let col = 28; col < dataRange[row].length; col++) { // Columns AC to BM
+          const roleValue = vlookup(headers[col - 28], roleData); // Adjust for index shift
           if (roleValue === lookupValue) {
             totalSum++;
           }
         }
       }
     }
-    results.push(totalSum);
 
+    Logger.log(`Total for sheet ${sheetName}, row ${i + 20}: ${totalSum}`);
+    results.push(totalSum);
   }
 
   // Write results to Sheet15 column E
   resultRange.setValues(results.map(r => [r]));
+
+  Logger.log(`Results written to Sheet15: ${results}`);
 }
