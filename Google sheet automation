@@ -1,79 +1,48 @@
-function calculateResults() {
+function countSpecificValues() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet15 = ss.getSheetByName("Sheet15");
   const roleSheet = ss.getSheetByName("Role");
-
-  // Get input ranges
-  const sourceSheets = sheet15.getRange("C20:C28").getValues().flat(); // Source sheet names
-  const lookupValues = sheet15.getRange("D20:D28").getValues().flat(); // Lookup values (D20:D28)
-  const resultRange = sheet15.getRange("E20:E28"); // Where results will be written
-  const filterValue = sheet15.getRange("A1").getValue(); // Filter value (Sheet15!A1)
-
-  // Role table for VLOOKUP
-  const roleData = roleSheet.getRange("A:B").getValues();
-
-  // Helper function: Simulate VLOOKUP
-  function vlookup(value, lookupTable) {
-    for (let i = 0; i < lookupTable.length; i++) {
-      if (lookupTable[i][0] === value) {
-        return lookupTable[i][1];
-      }
-    }
-    return null;
-  }
+  const sourceSheets = sheet15.getRange("C20:C28").getValues().flat(); // Source sheets listed in column C
+  const outputRange = sheet15.getRange("E20:E28");
+  const referenceRole = sheet15.getRange("D20:D28").getValues().flat(); // Roles to match in D20:D28
+  const targetValue = sheet15.getRange("A1").getValue(); // Value to match in A1
+  const countValues = ["Mrng1", "Mrng2", "Evng", "Ngt"];
+  const roleLookup = roleSheet.getRange("A2:B").getValues();
 
   const results = [];
 
-  for (let i = 0; i < sourceSheets.length; i++) {
-    const sheetName = sourceSheets[i];
-    const lookupValue = lookupValues[i];
-    if (!sheetName || !lookupValue) {
-      results.push(""); // Skip if no sheet name or lookup value
-      continue;
-    }
-
+  sourceSheets.forEach((sheetName, index) => {
+    if (!sheetName) return; // Skip empty rows
     const sheet = ss.getSheetByName(sheetName);
     if (!sheet) {
-      results.push("Sheet not found");
-      continue;
+      results.push(0);
+      return;
     }
 
-    // Get data from the source sheet
-    const dataRange = sheet.getRange("A3:BM367").getValues(); // Full data
-    const columnF = sheet.getRange("F3:F367").getValues(); // Column F (LEFTB filter)
-    const columnC = sheet.getRange("C3:C367").getValues(); // Column C (matches Sheet15!A1)
-    const headers = sheet.getRange("AC2:BM2").getValues()[0]; // Headers in AC2:BM2
+    const data = sheet.getRange(3, 1, sheet.getLastRow() - 2, sheet.getLastColumn()).getValues(); // Rows 3 onward
+    const headers = sheet.getRange(2, 27, 1, sheet.getLastColumn() - 26).getValues()[0]; // Headers from AC2:BM2
+    const columnF = sheet.getRange(3, 6, sheet.getLastRow() - 2, 1).getValues(); // Column F
+    const columnC = sheet.getRange(3, 3, sheet.getLastRow() - 2, 1).getValues(); // Column C
 
-    Logger.log(`Processing sheet: ${sheetName}`);
-    Logger.log(`Lookup Value: ${lookupValue}`);
-    Logger.log(`Headers: ${headers}`);
+    let count = 0;
 
-    let totalSum = 0;
+    data.forEach((row, rowIndex) => {
+      const leftbValue = parseInt(columnF[rowIndex][0]?.toString().substring(0, 2), 10);
+      if (isNaN(leftbValue) || leftbValue < 27) return; // Skip rows not meeting the >=27 condition
+      if (columnC[rowIndex][0] !== targetValue) return; // Skip rows not matching A1
 
-    for (let row = 0; row < dataRange.length; row++) {
-      const leftbValue = parseInt(columnF[row][0]?.toString().substring(0, 2)); // Simulate LEFTB
-      if (isNaN(leftbValue)) {
-        Logger.log(`Row ${row + 3}: Invalid LEFTB value: ${columnF[row][0]}`);
-        continue;
-      }
+      headers.forEach((header, colIndex) => {
+        const roleMatch = roleLookup.find(r => r[0] === header)?.[1]; // Match header with role
+        if (roleMatch !== referenceRole[index]) return; // Skip columns where roles don't match
 
-      // Check filtering conditions
-      if (leftbValue >= 27 && columnC[row][0] === filterValue) {
-        for (let col = 28; col < dataRange[row].length; col++) { // Columns AC to BM
-          const roleValue = vlookup(headers[col - 28], roleData); // Adjust for index shift
-          if (roleValue === lookupValue) {
-            totalSum++;
-          }
+        if (countValues.includes(row[colIndex + 26])) {
+          count++; // Increment if value matches one of the target values
         }
-      }
-    }
+      });
+    });
 
-    Logger.log(`Total for sheet ${sheetName}, row ${i + 20}: ${totalSum}`);
-    results.push(totalSum);
-  }
+    results.push(count);
+  });
 
-  // Write results to Sheet15 column E
-  resultRange.setValues(results.map(r => [r]));
-
-  Logger.log(`Results written to Sheet15: ${results}`);
+  outputRange.setValues(results.map(r => [r]));
 }
